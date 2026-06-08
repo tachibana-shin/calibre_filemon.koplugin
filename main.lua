@@ -74,7 +74,8 @@ function CalibreFileMon:saveMetadata(inbox_dir, books)
     rapidjson.dump(books, meta_file, { pretty = true })
 end
 
-function CalibreFileMon:onFileMoved(old_fullpath, new_fullpath)
+--@param is_dir boolean
+function CalibreFileMon:onFileMoved(old_fullpath, new_fullpath, is_dir)
     local inbox_dir, old_rel = self:getCalibreRelativePath(old_fullpath)
     if not inbox_dir then return end
     local _, new_rel = self:getCalibreRelativePath(new_fullpath)
@@ -83,17 +84,27 @@ function CalibreFileMon:onFileMoved(old_fullpath, new_fullpath)
     local books = self:loadMetadata(inbox_dir)
     if not books then return end
 
+    local changed = false
+    local old_prefix = old_rel .. "/"
+
     for i, book in ipairs(books) do
         if book.lpath == old_rel then
             book.lpath = new_rel
-            self:saveMetadata(inbox_dir, books)
-            logger.info("CalibreFileMon: updated lpath", old_rel, "->", new_rel)
-            return
+            changed = true
+        elseif is_dir and book.lpath:sub(1, #old_prefix) == old_prefix then
+            local suffix = book.lpath:sub(#old_prefix + 1)
+            book.lpath = new_rel .. "/" .. suffix
+            changed = true
         end
+    end
+
+    if changed then
+        self:saveMetadata(inbox_dir, books)
+        logger.info("CalibreFileMon: updated lpath", old_rel, "->", new_rel)
     end
 end
 
-function CalibreFileMon:onFileDeleted(fullpath)
+function CalibreFileMon:onFileDeleted(fullpath, is_dir)
     local inbox_dir, rel = self:getCalibreRelativePath(fullpath)
     if not inbox_dir then return end
 
@@ -101,8 +112,10 @@ function CalibreFileMon:onFileDeleted(fullpath)
     if not books then return end
 
     local found = false
+    local rel_prefix = rel .. "/"
+
     for i = #books, 1, -1 do
-        if books[i].lpath == rel then
+        if books[i].lpath == rel or (is_dir and books[i].lpath:sub(1, #rel_prefix) == rel_prefix) then
             table.remove(books, i)
             found = true
         end
@@ -134,8 +147,10 @@ function CalibreFileMon:wrapFileManager()
             dest_file = to
         end
 
-        if lfs.attributes(dest_file, "mode") == "file" then
-            plugin:onFileMoved(from, dest_file)
+        local dest_mode = lfs.attributes(dest_file, "mode")
+        local is_dir = dest_mode == "directory"
+        if dest_mode == "file" or is_dir then
+            plugin:onFileMoved(from, dest_file, is_dir)
         end
 
         return true
@@ -145,7 +160,7 @@ function CalibreFileMon:wrapFileManager()
     FileManager.deleteFile = function(self, file, is_file)
         local ok = orig_delete(self, file, is_file)
         if ok then
-            plugin:onFileDeleted(file)
+            plugin:onFileDeleted(file, not is_file)
         end
         return ok
     end
@@ -159,7 +174,7 @@ function CalibreFileMon:wrapFileManager()
         orig_deleteSelected(self)
         for _, file in ipairs(files) do
             if not lfs.attributes(file, "mode") then
-                plugin:onFileDeleted(file)
+                plugin:onFileDeleted(file, false)
             end
         end
     end

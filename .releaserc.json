@@ -1,0 +1,20 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    ["@semantic-release/exec", {
+      "prepareCmd": "sed -i 's/version\\s*=\\s*\"[^\"]*\"/version = \"${nextRelease.version}\"/' _meta.lua"
+    }],
+    ["@semantic-release/git", {
+      "assets": ["_meta.lua", "CHANGELOG.md"],
+      "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
+    }],
+    ["@semantic-release/github", {
+      "assets": [
+        {"path": "release/*.zip", "label": "KOReader Plugin ZIP"}
+      ]
+    }]
+  ]
+}
