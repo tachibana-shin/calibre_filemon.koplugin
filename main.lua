@@ -3,8 +3,9 @@ local lfs = require("libs/libkoreader-lfs")
 local rapidjson = require("rapidjson")
 local logger = require("logger")
 local ffiUtil = require("ffi/util")
+local util = require("util")
 
-local CalibreFileMon = WidgetContainer:extend{
+local CalibreFileMon = WidgetContainer:extend {
     name = "calibre_filemon",
     is_doc_only = false,
 }
@@ -25,8 +26,26 @@ function CalibreFileMon:getCalibreRelativePath(fullpath)
     return nil, nil
 end
 
+function CalibreFileMon:existOrLast(dir, file)
+    local fullname
+    local options = { file, "." .. file }
+    for _, option in ipairs(options) do
+        fullname = dir .. "/" .. option
+        if util.fileExists(fullname) then
+            return true, fullname
+        end
+    end
+    return false, fullname
+end
+
 function CalibreFileMon:loadMetadata(inbox_dir)
-    local meta_file = inbox_dir .. "/metadata.calibre"
+    local ok, meta_file = self:existOrLast(inbox_dir, "metadata.calibre")
+    if not ok then
+        return nil
+    end
+
+    self.metadata = meta_file
+
     local attr = lfs.attributes(meta_file)
     if not attr or attr.mode ~= "file" or attr.size == 0 then
         return nil
@@ -41,7 +60,17 @@ function CalibreFileMon:loadMetadata(inbox_dir)
 end
 
 function CalibreFileMon:saveMetadata(inbox_dir, books)
-    local meta_file = inbox_dir .. "/metadata.calibre"
+    local meta_file = self.metadata
+
+    if not meta_file then
+        local ok, meta_file2 = self:existOrLast(inbox_dir, "metadata.calibre")
+        if not ok then
+            return nil
+        end
+        meta_file = meta_file2
+        self.metadata = meta_file
+    end
+
     rapidjson.dump(books, meta_file, { pretty = true })
 end
 
