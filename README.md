@@ -2,6 +2,8 @@
 
 A [KOReader](https://koreader.rocks) plugin that automatically synchronizes Calibre library metadata (`metadata.calibre`) with file operations in the built-in file manager.
 
+This plugin will update Calibre's metadata file every time you move a file into a subfolder, helping Calibre accurately recognize that the book is still there
+
 ## Features
 
 - **Rename/Move books** — updates `lpath` in metadata when a book file is renamed or moved
